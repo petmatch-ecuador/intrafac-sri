@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexora Suite | Gestión Funeraria & SRI Ecuador</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+    <!-- PANTALLA DE ACCESO / REGISTRO -->
+    <div id="auth-screen" class="auth-wrapper">
+        <div class="auth-card">
+            <div class="brand-header">
+                <h1>Nexora Suite</h1>
+                <p>Plataforma Integral para Funerarias & Facturación SRI</p>
+            </div>
+            <div id="auth-alert" class="badge badge-danger hidden" style="display:block; margin-bottom:1rem; text-align:center;"></div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Correo electrónico</label>
+                    <input type="email" id="login-email" required placeholder="admin@funeraria.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Ingresar al Sistema</button>
+                <p style="text-align:center; margin-top:1rem; font-size:0.85rem;">
+                    ¿Primera vez? <a href="#" id="toggle-register" style="color:var(--accent); font-weight:600;">Registrar nueva funeraria</a>
+                </p>
+            </form>
+
+            <form id="register-form" class="hidden">
+                <div class="form-group">
+                    <label>Nombre de la Funeraria</label>
+                    <input type="text" id="reg-empresa" required placeholder="Ej: Funeraria Memorial Quito">
+                </div>
+                <div class="form-group">
+                    <label>RUC (13 dígitos)</label>
+                    <input type="text" id="reg-ruc" maxlength="13" required placeholder="1790000000001">
+                </div>
+                <div class="form-group">
+                    <label>Dirección Matriz</label>
+                    <input type="text" id="reg-direccion" required placeholder="Av. Maldonado y Morán Valverde, Quito">
+                </div>
+                <div class="form-group">
+                    <label>Tu Nombre Completo</label>
+                    <input type="text" id="reg-nombre" required placeholder="Administrador">
+                </div>
+                <div class="form-group">
+                    <label>Correo electrónico</label>
+                    <input type="email" id="reg-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña (mín. 6 caracteres)</label>
+                    <input type="password" id="reg-password" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Crear Cuenta y Configurar</button>
+                <p style="text-align:center; margin-top:1rem; font-size:0.85rem;">
+                    ¿Ya tienes cuenta? <a href="#" id="toggle-login" style="color:var(--accent); font-weight:600;">Iniciar sesión</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL (DASHBOARD) -->
+    <div id="app-screen" class="app-layout hidden">
+        <aside class="sidebar">
+            <h2>Nexora Suite</h2>
+            <small id="sidebar-org-name">Cargando organización...</small>
+            
+            <button class="nav-btn active" data-tab="tab-resumen">Resumen Operativo</button>
+            <button class="nav-btn" data-tab="tab-servicios">Servicios & Obituarios QR</button>
+            <button class="nav-btn" data-tab="tab-salas">Salas de Velación</button>
+            <button class="nav-btn" data-tab="tab-inventario">Inventario (Ataúdes/Urnas)</button>
+            <button class="nav-btn" data-tab="tab-clientes">Clientes & Familias</button>
+            <button class="nav-btn" data-tab="tab-prevision">Previsión Exequial</button>
+            <button class="nav-btn" data-tab="tab-sri">Configuración SRI</button>
+
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn btn-outline" style="width:100%; color:#fff; border-color:#475569;">Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="top-bar">
+                <h2 id="page-title">Resumen Operativo</h2>
+                <span id="user-badge" class="badge badge-warning">Ambiente SRI: Pruebas</span>
+            </div>
+
+            <!-- TAB 1: RESUMEN -->
+            <section id="tab-resumen" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card"><span>Servicios Activos</span><h3 id="stat-servicios">0</h3></div>
+                    <div class="stat-card"><span>Salas Disponibles</span><h3 id="stat-salas">0</h3></div>
+                    <div class="stat-card"><span>Ataúdes / Urnas en Stock</span><h3 id="stat-stock">0</h3></div>
+                    <div class="stat-card"><span>Planes Previsión Activos</span><h3 id="stat-planes">0</h3></div>
+                </div>
+                <div class="card">
+                    <h3>Accesos Rápidos</h3>
+                    <p style="color:var(--muted); margin:0.5rem 0 1rem;">Comienza registrando tus salas de velación e inventario inicial de ataúdes para poder abrir expedientes funerarios con descuento automático de stock.</p>
+                    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="switchTab('tab-servicios')">+ Nuevo Servicio Funerario</button>
+                        <button class="btn btn-dark" onclick="switchTab('tab-inventario')">+ Agregar Ataúd / Urna</button>
+                        <button class="btn btn-outline" onclick="switchTab('tab-salas')">+ Configurar Salas</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: SERVICIOS FUNERARIOS & OBITUARIOS QR -->
+            <section id="tab-servicios" class="tab-content hidden">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Registrar Nuevo Servicio Funerario</h3>
+                    </div>
+                    <form id="form-servicio" class="form-grid">
+                        <div class="form-group">
+                            <label>N° Expediente</label>
+                            <input type="text" id="srv-codigo" required placeholder="EXP-2026-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Familiar Responsable (Cliente)</label>
+                            <select id="srv-cliente" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nombres Completos del Fallecido</label>
+                            <input type="text" id="srv-fallecido" required placeholder="Ej: Juan Carlos Pérez Gómez">
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha y Hora de Fallecimiento</label>
+                            <input type="datetime-local" id="srv-fecha-fall" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de Servicio</label>
+                            <select id="srv-tipo">
+                                <option value="INHUMACION">Inhumación</option>
+                                <option value="CREMACION">Cremación</option>
+                                <option value="TRASLADO_NACIONAL">Traslado Nacional</option>
+                                <option value="REPATRIACION">Repatriación</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sala de Velación Asignada</label>
+                            <select id="srv-sala"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ataúd / Urna (Descuenta Stock)</label>
+                            <select id="srv-ataud"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Camposanto / Destino Final</label>
+                            <input type="text" id="srv-camposanto" placeholder="Ej: Camposanto Monteolivo">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Epitafio para Obituario Digital QR</label>
+                            <input type="text" id="srv-epitafio" value="Tu recuerdo vivirá por siempre en nuestros corazones.">
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <button type="submit" class="btn btn-primary">Guardar Expediente y Generar Obituario QR</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Expedientes Activos</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Expediente</th>
+                                    <th>Fallecido</th>
+                                    <th>Tipo</th>
+                                    <th>Sala</th>
+                                    <th>Camposanto</th>
+                                    <th>Obituario QR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-servicios"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: SALAS DE VELACIÓN -->
+            <section id="tab-salas" class="tab-content hidden">
+                <div class="card">
+                    <h3>Agregar Sala de Velación</h3>
+                    <form id="form-sala" class="form-grid">
+                        <div class="form-group">
+                            <label>Nombre de la Sala</label>
+                            <input type="text" id="sala-nombre" required placeholder="Ej: Sala VIP Celestial">
+                        </div>
+                        <div class="form-group">
+                            <label>Capacidad (Personas)</label>
+                            <input type="number" id="sala-capacidad" value="60" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Sucursal / Dirección</label>
+                            <input type="text" id="sala-direccion" placeholder="Matriz Sur">
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Guardar Sala</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <h3>Estado de Salas</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Sala</th><th>Capacidad</th><th>Sucursal</th><th>Estado</th><th>Acción</th></tr></thead>
+                            <tbody id="tbody-salas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: INVENTARIO -->
+            <section id="tab-inventario" class="tab-content hidden">
+                <div class="card">
+                    <h3>Registrar Producto / Ataúd / Servicio</h3>
+                    <form id="form-producto" class="form-grid">
+                        <div class="form-group">
+                            <label>Código Principal</label>
+                            <input type="text" id="prod-codigo" required placeholder="AT-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre del Ítem</label>
+                            <input type="text" id="prod-nombre" required placeholder="Ataúd Madera Cedro Tallado">
+                        </div>
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select id="prod-categoria">
+                                <option value="ATAUD">Ataúd</option>
+                                <option value="URNA">Urna</option>
+                                <option value="FLORES">Arreglo Floral</option>
+                                <option value="SERVICIO_FUNERARIO">Servicio Exequial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo SRI</label>
+                            <select id="prod-tipo">
+                                <option value="BIEN">Bien (Controla Stock)</option>
+                                <option value="SERVICIO">Servicio</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Precio Unitario ($)</label>
+                            <input type="number" step="0.01" id="prod-precio" required placeholder="650.00">
+                        </div>
+                        <div class="form-group">
+                            <label>IVA SRI</label>
+                            <select id="prod-iva">
+                                <option value="15">15% (Código 4)</option>
+                                <option value="0">0% (Código 0)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Stock Inicial</label>
+                            <input type="number" id="prod-stock" value="5" required>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Guardar en Inventario</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <h3>Catálogo e Inventario Actual</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>IVA</th><th>Stock</th></tr></thead>
+                            <tbody id="tbody-productos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: CLIENTES -->
+            <section id="tab-clientes" class="tab-content hidden">
+                <div class="card">
+                    <h3>Registrar Cliente / Familiar Responsable</h3>
+                    <form id="form-cliente" class="form-grid">
+                        <div class="form-group">
+                            <label>Tipo Identificación SRI</label>
+                            <select id="cli-tipo-id">
+                                <option value="05">Cédula (05)</option>
+                                <option value="04">RUC (04)</option>
+                                <option value="06">Pasaporte (06)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Número Cédula / RUC</label>
+                            <input type="text" id="cli-identificacion" required maxlength="13">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombres / Razón Social</label>
+                            <input type="text" id="cli-nombre" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Teléfono WhatsApp</label>
+                            <input type="text" id="cli-telefono" placeholder="0999999999">
+                        </div>
+                        <div class="form-group">
+                            <label>Correo (Envío Factura SRI)</label>
+                            <input type="email" id="cli-correo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Dirección</label>
+                            <input type="text" id="cli-direccion" value="Quito">
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Identificación</th><th>Nombre</th><th>Teléfono</th><th>Correo</th></tr></thead>
+                            <tbody id="tbody-clientes"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: PREVISIÓN EXEQUIAL -->
+            <section id="tab-prevision" class="tab-content hidden">
+                <div class="card">
+                    <h3>Nuevo Contrato de Previsión Exequial</h3>
+                    <form id="form-plan" class="form-grid">
+                        <div class="form-group">
+                            <label>N° Contrato</label>
+                            <input type="text" id="plan-contrato" required placeholder="PREV-2026-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Titular del Plan</label>
+                            <select id="plan-titular" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre del Plan</label>
+                            <input type="text" id="plan-nombre" required placeholder="Plan Familiar Integral">
+                        </div>
+                        <div class="form-group">
+                            <label>Cuota Mensual ($)</label>
+                            <input type="number" step="0.01" id="plan-cuota" required value="12.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha Inicio</label>
+                            <input type="date" id="plan-inicio" required>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Activar Contrato</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Contrato</th><th>Titular</th><th>Plan</th><th>Cuota</th><th>Estado</th></tr></thead>
+                            <tbody id="tbody-planes"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: CONFIGURACIÓN SRI -->
+            <section id="tab-sri" class="tab-content hidden">
+                <div class="card">
+                    <h3>Parámetros de Facturación Electrónica SRI (Ecuador 2026)</h3>
+                    <form id="form-sri-config" class="form-grid">
+                        <div class="form-group">
+                            <label>Ambiente SRI</label>
+                            <select id="sri-ambiente">
+                                <option value="1">1 - Pruebas (celcer.sri.gob.ec)</option>
+                                <option value="2">2 - Producción (cel.sri.gob.ec)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>RUC Proveedor Software (Res. 2026)</label>
+                            <input type="text" id="sri-ruc-prov" maxlength="13" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Establecimiento</label>
+                            <input type="text" id="sri-estab" maxlength="3" value="001">
+                        </div>
+                        <div class="form-group">
+                            <label>Punto Emisión</label>
+                            <input type="text" id="sri-pto" maxlength="3" value="001">
+                        </div>
+                        <div class="form-group">
+                            <label>Certificado Firma Electrónica (.p12)</label>
+                            <input type="file" id="sri-p12-file" accept=".p12,.pfx">
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña Firma .p12</label>
+                            <input type="password" id="sri-p12-pass">
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <button type="submit" class="btn btn-primary">Guardar Configuración SRI</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL CÓDIGO QR OBITUARIO -->
+    <div id="qr-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="text-align:center;">
+            <h3 id="qr-title">Obituario Digital</h3>
+            <p style="color:var(--muted); font-size:0.9rem; margin:0.5rem 0;">Imprime este código QR para colocarlo en la sala de velación:</p>
+            <div id="qrcode-container" style="display:flex; justify-content:center; margin:1.25rem 0;"></div>
+            <p id="qr-url-text" style="font-size:0.8rem; word-break:break-all; color:var(--primary); margin-bottom:1rem;"></p>
+            <div style="display:flex; gap:0.5rem; justify-content:center;">
+                <a id="qr-open-link" href="#" target="_blank" class="btn btn-primary">Abrir Vista Familiar</a>
+                <button onclick="document.getElementById('qr-modal').classList.add('hidden')" class="btn btn-outline">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
