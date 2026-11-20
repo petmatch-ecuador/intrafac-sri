@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexora Suite | Gestión Funeraria, Control Gerencial y Finanzas</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <!-- PANTALLA DE AUTENTICACIÓN -->
+    <div id="auth-screen" class="auth-wrapper">
+        <div class="auth-card">
+            <div class="brand-header">
+                <span class="brand-pill">NEXORA SUITE</span>
+                <h1>Acceso al Sistema</h1>
+                <p>Gestión Integral de Servicios Exequiales, Proformas, Operación y Control Gerencial</p>
+            </div>
+            <div id="auth-alert" class="alert hidden"></div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Correo electrónico corporativo *</label>
+                    <input type="email" id="login-email" required placeholder="usuario@funeraria.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña *</label>
+                    <input type="password" id="login-password" required placeholder="Ingrese su contraseña" autocomplete="current-password">
+                </div>
+                <button type="submit" id="btn-login-submit" class="btn btn-primary btn-block">Iniciar Sesión</button>
+                <p class="auth-switch">¿Aún no registra su empresa? <a href="#" id="toggle-register">Crear cuenta empresarial</a></p>
+            </form>
+
+            <form id="register-form" class="hidden">
+                <div class="form-group">
+                    <label>Razón Social / Nombre de la Funeraria *</label>
+                    <input type="text" id="reg-empresa" required placeholder="Servicios Exequiales S.A.">
+                </div>
+                <div class="form-group">
+                    <label>RUC (13 dígitos) *</label>
+                    <input type="text" id="reg-ruc" maxlength="13" pattern="\d{13}" required placeholder="1790000000001">
+                </div>
+                <div class="form-group">
+                    <label>Dirección Matriz *</label>
+                    <input type="text" id="reg-direccion" required placeholder="Av. Amazonas y Naciones Unidas, Quito">
+                </div>
+                <div class="form-group">
+                    <label>Nombre del Administrador *</label>
+                    <input type="text" id="reg-nombre" required placeholder="Nombre y Apellido">
+                </div>
+                <div class="form-group">
+                    <label>Correo electrónico *</label>
+                    <input type="email" id="reg-email" required placeholder="administracion@funeraria.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña (mínimo 8 caracteres, mayúscula, minúscula, número y símbolo) *</label>
+                    <input type="password" id="reg-password" minlength="8" required autocomplete="new-password" oninput="evaluarFortalezaClave(this.value)">
+                    <div class="pwd-meter-wrap">
+                        <div id="pwd-meter-bar" class="pwd-meter-bar"></div>
+                    </div>
+                    <small id="pwd-meter-text" class="muted-text">Nivel de seguridad: pendiente</small>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Registrar Empresa</button>
+                <p class="auth-switch">¿Ya dispone de una cuenta? <a href="#" id="toggle-login">Volver al inicio de sesión</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- APLICACIÓN PRINCIPAL -->
+    <div id="app-screen" class="app-layout hidden">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-title-row">
+                    <h2>Nexora Suite</h2>
+                    <span class="version-tag" id="sidebar-rol-tag">ADMIN</span>
+                </div>
+                <p id="sidebar-org-name" class="org-title">Cargando entidad...</p>
+                <p id="sidebar-user-info" class="user-sub-info"></p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">DIRECCIÓN Y ANÁLISIS</div>
+                <button type="button" class="nav-btn active" data-tab="tab-gerencial">Control Gerencial y Estadísticas</button>
+                <button type="button" class="nav-btn" data-tab="tab-resumen">Resumen Operativo Diario</button>
+
+                <div class="nav-section-label">OPERACIÓN EXEQUIAL</div>
+                <button type="button" class="nav-btn" data-tab="tab-proformas">Proformas</button>
+                <button type="button" class="nav-btn" data-tab="tab-servicios">Servicios y Salas</button>
+                <button type="button" class="nav-btn" data-tab="tab-inventario">Inventario y Tarifario</button>
+
+                <div class="nav-section-label">FINANZAS Y CONTROL</div>
+                <button type="button" class="nav-btn" data-tab="tab-finanzas">Ingresos, Gastos y Ganancias</button>
+                <button type="button" class="nav-btn" data-tab="tab-configuracion">Configuración y Seguridad</button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div id="session-countdown-sidebar" class="session-status-box">Sesión: --:--</div>
+                <button id="btn-logout" class="btn btn-sidebar-outline btn-block">Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1 id="page-title">Control Gerencial y Estadísticas</h1>
+                    <p id="page-subtitle" class="topbar-subtitle">Consolidado gerencial de ingresos, gastos, ganancias brutas e indicadores estadísticos por mes o por año</p>
+                </div>
+                <div class="topbar-actions">
+                    <span id="user-badge" class="badge badge-neutral">Ambiente: Pruebas</span>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="refreshAllData()">Actualizar Datos</button>
+                </div>
+            </header>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 1: CONTROL GERENCIAL CONSOLIDADO Y ESTADÍSTICAS        -->
+            <!-- ============================================================ -->
+            <section id="tab-gerencial" class="tab-content">
+                <div class="card filter-bar-card">
+                    <div class="gerencial-filter-row">
+                        <div>
+                            <h3>Período de Análisis Gerencial</h3>
+                            <p class="muted-text">Consulte ingresos, gastos, ganancias brutas y gráficos por mes, por año o histórico completo</p>
+                        </div>
+                        <div class="filter-controls">
+                            <div class="form-group">
+                                <label>Modalidad *</label>
+                                <select id="ger-modo-periodo" onchange="cambiarModoGerencial()">
+                                    <option value="MES" selected>Por Mes</option>
+                                    <option value="ANIO">Por Año</option>
+                                    <option value="TODO">Histórico Completo</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="ger-wrap-anio">
+                                <label>Año *</label>
+                                <select id="ger-anio" onchange="actualizarVistaGerencial()"></select>
+                            </div>
+                            <div class="form-group" id="ger-wrap-mes">
+                                <label>Mes *</label>
+                                <select id="ger-mes" onchange="actualizarVistaGerencial()">
+                                    <option value="0">Enero</option>
+                                    <option value="1">Febrero</option>
+                                    <option value="2">Marzo</option>
+                                    <option value="3">Abril</option>
+                                    <option value="4">Mayo</option>
+                                    <option value="5">Junio</option>
+                                    <option value="6">Julio</option>
+                                    <option value="7">Agosto</option>
+                                    <option value="8">Septiembre</option>
+                                    <option value="9">Octubre</option>
+                                    <option value="10">Noviembre</option>
+                                    <option value="11">Diciembre</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ingresos del Período</span>
+                        <h3 id="ger-kpi-ingresos">$0.00</h3>
+                        <small class="kpi-trend" id="ger-kpi-ingresos-sub">0 comprobantes emitidos</small>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Gastos del Período</span>
+                        <h3 id="ger-kpi-gastos">$0.00</h3>
+                        <small class="kpi-trend" id="ger-kpi-gastos-sub">0 gastos registrados</small>
+                    </div>
+                    <div class="kpi-card kpi-highlight">
+                        <span class="kpi-label">Ganancia Bruta del Período</span>
+                        <h3 id="ger-kpi-ganancia">$0.00</h3>
+                        <small class="kpi-trend" id="ger-kpi-margen">Margen bruto: 0.0%</small>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Servicios Atendidos</span>
+                        <h3 id="ger-kpi-servicios">0</h3>
+                        <small class="kpi-trend" id="ger-kpi-ticket">Ticket promedio: $0.00</small>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="card chart-card-wide">
+                        <div class="card-header-flex">
+                            <div>
+                                <h3 id="chart-evolucion-titulo">Comparativo Estadístico: Ingresos, Gastos y Ganancia Bruta</h3>
+                                <p class="muted-text" id="chart-evolucion-sub">Comportamiento financiero desglosado en el período seleccionado</p>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-wrapper">
+                            <canvas id="chart-gerencial-evolucion"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header-flex">
+                            <div>
+                                <h3>Estructura de Gastos por Categoría</h3>
+                                <p class="muted-text">Participación porcentual de costos operativos</p>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-wrapper">
+                            <canvas id="chart-gerencial-gastos"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-flex">
+                        <div>
+                            <h3>Desglose Consolidado del Período</h3>
+                            <p class="muted-text">Resumen tabular de ingresos, gastos, ganancia bruta y margen</p>
+                        </div>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline" onclick="abrirModuloFinanciero('fin-ingresos')">Ingresos</button>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="abrirModuloFinanciero('fin-gastos')">Gastos</button>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="abrirModuloFinanciero('fin-ganancias')">Ganancias Brutas</button>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Subperíodo</th>
+                                <th>Ingresos ($)</th>
+                                <th>Gastos ($)</th>
+                                <th>Ganancia Bruta ($)</th>
+                                <th>Margen Bruto (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-gerencial-consolidado"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 2: RESUMEN OPERATIVO DIARIO                            -->
+            <!-- ============================================================ -->
+            <section id="tab-resumen" class="tab-content hidden">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">Servicios Activos</span>
+                        <h3 id="stat-servicios">0</h3>
+                        <small class="kpi-trend" id="stat-velando-detalle">0 en sala • 0 por velar</small>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Salas Disponibles</span>
+                        <h3 id="stat-salas">0</h3>
+                        <small class="kpi-trend">Listas para asignación</small>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ingresos Totales</span>
+                        <h3 id="stat-ingresos">$0.00</h3>
+                        <small class="kpi-trend" id="stat-egresos-small">Gastos: $0.00</small>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ganancia Bruta Acumulada</span>
+                        <h3 id="stat-ganancia">$0.00</h3>
+                        <small class="kpi-trend">Ingresos menos gastos operativos</small>
+                    </div>
+                </div>
+
+                <div class="two-col-grid">
+                    <div class="card">
+                        <div class="card-header-flex">
+                            <div>
+                                <h3>Velaciones en Curso y Salas Ocupadas</h3>
+                                <p class="muted-text">Detalle inmediato de salas asignadas y expedientes activos</p>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="switchTab('tab-servicios')">Ir a Servicios y Salas</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Sala</th>
+                                    <th>Fallecido</th>
+                                    <th>Seguro</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-resumen-salas"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header-flex">
+                            <div>
+                                <h3>Alertas Operativas y Bodega</h3>
+                                <p class="muted-text">Control de inventario mínimo y estado de emisión</p>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="switchTab('tab-inventario')">Ver Inventario</button>
+                        </div>
+                        <div id="resumen-alertas-lista" class="status-list">
+                            <div class="status-item">Cargando estado operativo...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 3: PROFORMAS (1. DIRECTORIO DE CLIENTES / 2. PROFORMAS) -->
+            <!-- ============================================================ -->
+            <section id="tab-proformas" class="tab-content hidden">
+                <div class="subnav-bar">
+                    <button type="button" class="subnav-btn active" data-sub="prf-clientes" onclick="switchSubView('tab-proformas', 'prf-clientes', this)">Directorio de Clientes</button>
+                    <button type="button" class="subnav-btn" data-sub="prf-cotizaciones" onclick="switchSubView('tab-proformas', 'prf-cotizaciones', this)">Proformas y Prospectos</button>
+                </div>
+
+                <div id="comercial-feedback" class="alert alert-info hidden"></div>
+
+                <!-- Subvista 1: Directorio de Clientes (Primer lugar) -->
+                <div id="prf-clientes" class="subview-panel">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Directorio de Clientes y Contratantes</h2>
+                            <p class="muted-text">Registro obligatorio de clientes para cotizaciones, contratos exequiales y emisión de facturas.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-cliente')">Nuevo Cliente</button>
+                    </div>
+
+                    <div id="panel-form-cliente" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <h3>Registrar Cliente</h3>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-cliente')">Cerrar</button>
+                        </div>
+                        <form id="form-cliente" class="grid-form">
+                            <div class="form-group">
+                                <label>Tipo de Identificación *</label>
+                                <select id="cli-tipo-id" required>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="RUC">RUC</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Identificación *</label>
+                                <input type="text" id="cli-identificacion" required placeholder="Ej. 1712345678">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombres y Apellidos / Razón Social *</label>
+                                <input type="text" id="cli-nombre" required placeholder="Nombre completo o razón social">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono *</label>
+                                <input type="text" id="cli-telefono" required placeholder="0999999999">
+                            </div>
+                            <div class="form-group">
+                                <label>Correo Electrónico *</label>
+                                <input type="email" id="cli-correo" required placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Dirección Domiciliaria *</label>
+                                <input type="text" id="cli-direccion" required placeholder="Dirección completa">
+                            </div>
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-cliente')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Panel de Emisión de Factura / Cierre de Trato dentro de Clientes -->
+                    <div id="panel-facturar-cliente" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <div>
+                                <h3>Emitir Factura / Cerrar Trato con Cliente</h3>
+                                <p class="muted-text">Al emitir la factura permanece en esta vista y el ingreso se registra automáticamente en Finanzas y Control Gerencial.</p>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-facturar-cliente')">Cerrar</button>
+                        </div>
+                        <form id="form-factura-cliente">
+                            <div class="grid-form">
+                                <div class="form-group">
+                                    <label>Cliente *</label>
+                                    <select id="fac-cliente" required></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Forma de Pago *</label>
+                                    <select id="fac-forma-pago" required>
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Tarjeta de crédito/débito">Tarjeta de crédito/débito</option>
+                                        <option value="Transferencia bancaria">Transferencia bancaria</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Proforma / Contrato de Referencia</label>
+                                    <select id="fac-proforma-ref"></select>
+                                </div>
+                            </div>
+
+                            <div class="invoice-builder">
+                                <h4>Detalle de Rubros del Servicio / Factura</h4>
+                                <div class="item-adder-row">
+                                    <select id="fac-select-prod"></select>
+                                    <input type="number" id="fac-item-cant" value="1" min="1" step="1">
+                                    <button type="button" class="btn btn-secondary" onclick="agregarItemFactura()">Agregar Ítem</button>
+                                </div>
+
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Código</th>
+                                            <th>Descripción</th>
+                                            <th>Cant.</th>
+                                            <th>P. Unitario</th>
+                                            <th>IVA</th>
+                                            <th>Subtotal</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-fac-items"></tbody>
+                                </table>
+
+                                <div class="invoice-totals">
+                                    <div>Subtotal 15%: <strong id="fac-sub-15">$0.00</strong></div>
+                                    <div>Subtotal 0%: <strong id="fac-sub-0">$0.00</strong></div>
+                                    <div>IVA 15%: <strong id="fac-iva-val">$0.00</strong></div>
+                                    <div class="total-grand">Total a Pagar: <strong id="fac-total">$0.00</strong></div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Emitir Factura y Registrar Ingreso</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-facturar-cliente')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Clientes Registrados</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Tipo / Identificación</th>
+                                    <th>Nombre / Razón Social</th>
+                                    <th>Teléfono</th>
+                                    <th>Correo</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-clientes"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Subvista 2: Proformas y Prospectos (Segundo lugar) -->
+                <div id="prf-cotizaciones" class="subview-panel hidden">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Proformas y Cotizaciones por Categoría y Nivel de Servicio</h2>
+                            <p class="muted-text">Configure sala de velación, ataúd/urna, cafetería, nicho/destino y arreglo según gama y cantidad. Al cerrar trato, emita su factura aquí mismo.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-proforma')">Nueva Proforma</button>
+                    </div>
+
+                    <div id="panel-form-proforma" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <h3>Elaborar Proforma de Servicio Funerario</h3>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-proforma')">Cerrar</button>
+                        </div>
+                        <form id="form-proforma" class="grid-form">
+                            <div class="form-group">
+                                <label>Código Proforma *</label>
+                                <input type="text" id="prf-codigo" required placeholder="PRO-2026-001">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombre del Solicitante / Cliente *</label>
+                                <input type="text" id="prf-nombre" required placeholder="Nombre y apellido">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo de Identificación *</label>
+                                <select id="prf-tipo-id" required>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="RUC">RUC</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Identificación *</label>
+                                <input type="text" id="prf-identificacion" required placeholder="Número de documento">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono de Contacto *</label>
+                                <input type="text" id="prf-telefono" required placeholder="0999999999">
+                            </div>
+                            <div class="form-group">
+                                <label>Sector / Casa de Salud *</label>
+                                <input type="text" id="prf-ubicacion" required placeholder="Ej. Quito Sur / Hospital">
+                            </div>
+
+                            <!-- Componentes categorizados según mercado funerario -->
+                            <div class="form-group full-col">
+                                <label>Selección de Rubros por Categoría y Gama (menor gama/cantidad = menor valor; mayor gama/cantidad = mayor valor)</label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>1. Sala de Velación (Gama / Tiempo) *</label>
+                                <select id="prf-cat-sala" required onchange="recalcularProformaMercado()">
+                                    <option value="0" data-label="Sin sala de velación">Sin sala ($0.00)</option>
+                                    <option value="280" data-label="Sala Estándar (12h)">Sala Estándar - 12h ($280.00)</option>
+                                    <option value="520" data-label="Sala Principal (24h)" selected>Sala Principal - 24h ($520.00)</option>
+                                    <option value="950" data-label="Capilla VIP / Ejecutiva (48h)">Capilla VIP Ejecutiva - 48h ($950.00)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>2. Ataúd o Urna (Calidad / Material) *</label>
+                                <select id="prf-cat-ataud" required onchange="recalcularProformaMercado()">
+                                    <option value="260" data-label="Cofre Básico / Urna Estándar">Cofre Básico / Urna Estándar ($260.00)</option>
+                                    <option value="650" data-label="Cofre Madera Intermedio" selected>Cofre Madera Intermedio ($650.00)</option>
+                                    <option value="1350" data-label="Cofre Caoba Ejecutivo">Cofre Caoba Ejecutivo ($1,350.00)</option>
+                                    <option value="2400" data-label="Cofre Lujo Importado / Capitoné">Cofre Lujo Importado ($2,400.00)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>3. Servicio de Cafetería (Cobertura / Cantidad) *</label>
+                                <select id="prf-cat-cafeteria" required onchange="recalcularProformaMercado()">
+                                    <option value="0" data-label="Sin servicio de cafetería">Sin cafetería ($0.00)</option>
+                                    <option value="120" data-label="Cafetería Básica (hasta 30 personas)">Cafetería Básica - 30 pax ($120.00)</option>
+                                    <option value="260" data-label="Cafetería Estándar (hasta 80 personas)" selected>Cafetería Estándar - 80 pax ($260.00)</option>
+                                    <option value="480" data-label="Cafetería Ejecutiva y Bocaditos (150+ pax)">Cafetería Ejecutiva - 150+ pax ($480.00)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>4. Nicho / Destino Final *</label>
+                                <select id="prf-cat-nicho" required onchange="recalcularProformaMercado()">
+                                    <option value="0" data-label="No incluye nicho/camposanto">No incluye ($0.00)</option>
+                                    <option value="450" data-label="Nicho Temporal / Cremación Estándar">Nicho Temporal / Cremación ($450.00)</option>
+                                    <option value="980" data-label="Nicho Perpetuo / Bóveda Estándar" selected>Nicho Perpetuo ($980.00)</option>
+                                    <option value="2200" data-label="Espacio Familiar / Jardín Memorial Premium">Espacio Memorial Premium ($2,200.00)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>5. Arreglo Estético, Capilla y Traslado *</label>
+                                <select id="prf-cat-arreglo" required onchange="recalcularProformaMercado()">
+                                    <option value="110" data-label="Traslado local y arreglo básico">Básico - Traslado y arreglo ($110.00)</option>
+                                    <option value="240" data-label="Preparación, arreglo floral y capilla estándar" selected>Estándar - Preparación y flores ($240.00)</option>
+                                    <option value="520" data-label="Arreglo floral amplio, capilla ardiente y cortejo VIP">Lujo - Flores, capilla y cortejo ($520.00)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Cantidad de Servicios / Paquetes *</label>
+                                <input type="number" min="1" step="1" id="prf-cantidad" value="1" required oninput="recalcularProformaMercado()">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Seguro / Convenio *</label>
+                                <input type="text" id="prf-nombre-seguro" required value="Particular" placeholder="Ej. Particular, Seguro Privado, Convenio">
+                            </div>
+                            <div class="form-group">
+                                <label>Cobertura del Seguro ($) *</label>
+                                <input type="number" step="0.01" min="0" id="prf-cobertura-seguro" value="0.00" required oninput="calcularResumenFinanciero('prf')">
+                            </div>
+                            <div class="form-group">
+                                <label>Valor Total Calculado del Servicio ($) *</label>
+                                <input type="number" step="0.01" min="0" id="prf-valor-servicio" value="2450.00" required oninput="calcularResumenFinanciero('prf')">
+                            </div>
+                            <div class="form-group">
+                                <label>Descuento Aplicado (%) *</label>
+                                <input type="number" step="0.01" min="0" max="100" id="prf-descuento-pct" value="0.00" required oninput="calcularResumenFinanciero('prf')">
+                            </div>
+
+                            <div class="form-group full-col calc-summary-box">
+                                <div class="calc-grid">
+                                    <div><span>Valor Servicio</span><strong id="prf-calc-servicio">$0.00</strong></div>
+                                    <div><span>Descuento (<span id="prf-calc-pct-lbl">0%</span>)</span><strong id="prf-calc-desc-monto">-$0.00</strong></div>
+                                    <div><span>Cobertura Seguro</span><strong id="prf-calc-seguro">-$0.00</strong></div>
+                                    <div class="calc-neto"><span>Total Neto Estimado</span><strong id="prf-calc-neto">$0.00</strong></div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Estado del Prospecto / Trato *</label>
+                                <select id="prf-estado" required>
+                                    <option value="COTIZACION_EMITIDA">Cotización emitida</option>
+                                    <option value="PROFORMA_ENVIADA">Proforma enviada</option>
+                                    <option value="TRATO_CERRADO">Trato cerrado (Listo para facturar)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Forma de Pago Prevista *</label>
+                                <select id="prf-forma-pago" required>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Tarjeta de crédito/débito">Tarjeta de crédito/débito</option>
+                                    <option value="Transferencia bancaria">Transferencia bancaria</option>
+                                </select>
+                            </div>
+                            <div class="form-group full-col">
+                                <label>Detalle de Alcance y Observaciones *</label>
+                                <input type="text" id="prf-notas" required placeholder="Resumen de condiciones acordadas con el cliente">
+                            </div>
+
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Proforma</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-proforma')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Proformas y Prospectos Registrados</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Código / Fecha</th>
+                                    <th>Solicitante / Documento</th>
+                                    <th>Rubros y Gama</th>
+                                    <th>Total Neto</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-proformas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 4: SERVICIOS EXEQUIALES Y SALAS (FLUJO OPERATIVO)        -->
+            <!-- ============================================================ -->
+            <section id="tab-servicios" class="tab-content hidden">
+                <div class="subnav-bar">
+                    <button type="button" class="subnav-btn active" data-sub="srv-expedientes" onclick="switchSubView('tab-servicios', 'srv-expedientes', this)">Expedientes y Proceso Operativo</button>
+                    <button type="button" class="subnav-btn" data-sub="srv-salas" onclick="switchSubView('tab-servicios', 'srv-salas', this)">Salas y Desinfección</button>
+                </div>
+
+                <div id="srv-expedientes" class="subview-panel">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Ejecución de Servicio Funerario (Contrato, Cobro, Trámites, Velación y Cierre)</h2>
+                            <p class="muted-text">Seguimiento operativo: elaboración de contrato, cobro, trámites legales, arreglo estético, sala, traslado, sepultura, capilla y desinfección.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-servicio')">Nuevo Servicio / Contrato</button>
+                    </div>
+
+                    <div id="panel-form-servicio" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <h3>Registrar Contrato y Orden de Servicio</h3>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-servicio')">Cerrar</button>
+                        </div>
+                        <form id="form-servicio" class="grid-form">
+                            <div class="form-group"><label>Código de Contrato / Servicio *</label><input type="text" id="srv-codigo" required placeholder="SRV-2026-001"></div>
+                            <div class="form-group"><label>Cliente Contratante *</label><select id="srv-cliente" required></select></div>
+                            <div class="form-group"><label>Nombres Completos del Fallecido *</label><input type="text" id="srv-fallecido" required></div>
+                            <div class="form-group"><label>Fecha de Fallecimiento *</label><input type="date" id="srv-fecha-fall" required></div>
+
+                            <div class="form-group"><label>Seguro / Convenio *</label><input type="text" id="srv-nombre-seguro" required value="Particular"></div>
+                            <div class="form-group"><label>Cobertura del Seguro ($) *</label><input type="number" step="0.01" min="0" id="srv-cobertura-seguro" value="0.00" required oninput="calcularResumenFinanciero('srv')"></div>
+                            <div class="form-group"><label>Valor Total del Servicio ($) *</label><input type="number" step="0.01" min="0" id="srv-valor-servicio" value="0.00" required oninput="calcularResumenFinanciero('srv')"></div>
+                            <div class="form-group"><label>Descuento (%) *</label><input type="number" step="0.01" min="0" max="100" id="srv-descuento-pct" value="0.00" required oninput="calcularResumenFinanciero('srv')"></div>
+
+                            <div class="form-group full-col calc-summary-box">
+                                <div class="calc-grid">
+                                    <div><span>Valor Servicio</span><strong id="srv-calc-servicio">$0.00</strong></div>
+                                    <div><span>Descuento (<span id="srv-calc-pct-lbl">0%</span>)</span><strong id="srv-calc-desc-monto">-$0.00</strong></div>
+                                    <div><span>Cobertura Seguro</span><strong id="srv-calc-seguro">-$0.00</strong></div>
+                                    <div class="calc-neto"><span>Saldo Neto del Contrato</span><strong id="srv-calc-neto">$0.00</strong></div>
+                                </div>
+                            </div>
+
+                            <div class="form-group"><label>Casa de Salud / Procedencia *</label><input type="text" id="srv-casa-salud" required placeholder="Hospital / Clínica / Domicilio"></div>
+                            <div class="form-group"><label>Responsable de Trámites y Traslado *</label><input type="text" id="srv-gestor" required placeholder="Nombre del responsable"></div>
+
+                            <div class="form-group">
+                                <label>Etapa del Flujo Operativo *</label>
+                                <select id="srv-estado" required>
+                                    <option value="CONTRATO_Y_COBRO">Contrato elaborado y cobro registrado</option>
+                                    <option value="TRAMITES_Y_ESTETICA">Trámites legales y arreglo estético</option>
+                                    <option value="EN_VELACION">Preparación de sala, traslado y velación</option>
+                                    <option value="SEPULTURA_Y_RECOJO">Sepultura y recojo de capilla ardiente</option>
+                                    <option value="FINALIZADO">Limpieza y desinfección completada (Fin)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Destino / Sepultura *</label>
+                                <select id="srv-tipo" required>
+                                    <option value="INHUMACION">Santa sepultura / Inhumación</option>
+                                    <option value="CREMACION">Cremación</option>
+                                    <option value="REPATRIACION">Traslado / Repatriación</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Sala de Velación</label><select id="srv-sala"></select></div>
+                            <div class="form-group"><label>Ataúd / Urna</label><select id="srv-ataud"></select></div>
+                            <div class="form-group"><label>Camposanto / Cementerio *</label><input type="text" id="srv-camposanto" required placeholder="Nombre del camposanto"></div>
+                            <div class="form-group full-col"><label>Inspección del Servicio, Preparación y Traslado *</label><input type="text" id="srv-tramites-resumen" required placeholder="Verificación de documentación, arreglo estético, traslado y sala"></div>
+                            <div class="form-group full-col"><label>Texto para Obituario Digital QR</label><input type="text" id="srv-epitafio" placeholder="Dedicatoria para el obituario"></div>
+
+                            <div class="form-group full-col">
+                                <label>Documentación Legal Verificada</label>
+                                <div class="checks-row">
+                                    <label class="check-pill"><input type="checkbox" id="doc-ced-fall"> Cédula del Fallecido</label>
+                                    <label class="check-pill"><input type="checkbox" id="doc-cert-def"> Certificado Médico de Defunción</label>
+                                    <label class="check-pill"><input type="checkbox" id="doc-aut-inh"> Autorización Sepultura / Cremación</label>
+                                    <label class="check-pill"><input type="checkbox" id="doc-ced-fam"> Cédula del Contratante</label>
+                                    <label class="check-pill"><input type="checkbox" id="doc-ord-tras"> Orden de Traslado</label>
+                                </div>
+                            </div>
+
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Contrato y Servicio</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-servicio')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Servicios y Expedientes Registrados</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Código / Etapa</th>
+                                    <th>Fallecido / Sala</th>
+                                    <th>Seguro y Liquidación</th>
+                                    <th>Documentación</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-servicios"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="srv-salas" class="subview-panel hidden">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Salas de Velación, Recojo de Capilla y Desinfección</h2>
+                            <p class="muted-text">Control de disponibilidad de salas tras el recojo de capilla ardiente y limpieza/desinfección.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-sala')">Nueva Sala</button>
+                    </div>
+
+                    <div id="panel-form-sala" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <h3>Registrar Sala de Velación</h3>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-sala')">Cerrar</button>
+                        </div>
+                        <form id="form-sala" class="grid-form">
+                            <div class="form-group"><label>Nombre de la Sala *</label><input type="text" id="sala-nombre" required placeholder="Sala Memorial 1"></div>
+                            <div class="form-group"><label>Capacidad (Personas) *</label><input type="number" id="sala-capacidad" value="60" min="1" required></div>
+                            <div class="form-group"><label>Sede / Ubicación *</label><input type="text" id="sala-direccion" required placeholder="Sede Matriz"></div>
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Sala</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-sala')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Estado de Salas</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Sala</th>
+                                    <th>Capacidad</th>
+                                    <th>Ubicación</th>
+                                    <th>Estado</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-salas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 5: INVENTARIO Y TARIFARIO                              -->
+            <!-- ============================================================ -->
+            <section id="tab-inventario" class="tab-content hidden">
+                <div class="module-toolbar">
+                    <div>
+                        <h2>Inventario de Ataúdes, Urnas y Tarifario de Servicios</h2>
+                        <p class="muted-text">Control de existencias físicas, stock mínimo y tarifas de IVA vigentes.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-producto')">Nuevo Ítem</button>
+                </div>
+
+                <div id="panel-form-producto" class="card form-drawer hidden">
+                    <div class="drawer-header">
+                        <h3>Registrar Ítem en Catálogo</h3>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-producto')">Cerrar</button>
+                    </div>
+                    <form id="form-producto" class="grid-form">
+                        <div class="form-group"><label>Código Principal *</label><input type="text" id="prod-codigo" required placeholder="CF-001"></div>
+                        <div class="form-group"><label>Descripción del Ítem *</label><input type="text" id="prod-nombre" required placeholder="Cofre Madera Caoba"></div>
+                        <div class="form-group">
+                            <label>Categoría *</label>
+                            <select id="prod-categoria" required>
+                                <option value="ATAUD">Ataúd / Cofre</option>
+                                <option value="URNA">Urna</option>
+                                <option value="PLAN_EXEQUIAL">Servicio Exequial</option>
+                                <option value="CAFETERIA">Cafetería</option>
+                                <option value="NICHO">Nicho / Sepultura</option>
+                                <option value="FLORISTERIA">Arreglo Estético y Flores</option>
+                                <option value="TRASLADO">Traslado y Capilla</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de Ítem *</label>
+                            <select id="prod-tipo" required>
+                                <option value="BIEN">Bien (Controla Stock)</option>
+                                <option value="SERVICIO">Servicio</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Precio Unitario ($) *</label><input type="number" step="0.01" min="0" id="prod-precio" required></div>
+                        <div class="form-group">
+                            <label>Tarifa IVA *</label>
+                            <select id="prod-iva" required>
+                                <option value="15">15%</option>
+                                <option value="0">0%</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Stock Inicial *</label><input type="number" id="prod-stock" value="5" min="0" required></div>
+                        <div class="form-group"><label>Stock Mínimo *</label><input type="number" id="prod-stock-min" value="2" min="0" required></div>
+                        <div class="form-actions full-col">
+                            <button type="submit" class="btn btn-primary">Guardar Ítem</button>
+                            <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-producto')">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Existencias y Tarifas Registradas</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Descripción</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>IVA</th>
+                                <th>Stock</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-productos"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 6: INGRESOS, GASTOS Y GANANCIAS BRUTAS                 -->
+            <!-- ============================================================ -->
+            <section id="tab-finanzas" class="tab-content hidden">
+                <div class="subnav-bar">
+                    <button type="button" class="subnav-btn active" data-sub="fin-ingresos" onclick="switchSubView('tab-finanzas', 'fin-ingresos', this)">Ingresos</button>
+                    <button type="button" class="subnav-btn" data-sub="fin-gastos" onclick="switchSubView('tab-finanzas', 'fin-gastos', this)">Gastos</button>
+                    <button type="button" class="subnav-btn" data-sub="fin-ganancias" onclick="switchSubView('tab-finanzas', 'fin-ganancias', this)">Ganancias Brutas</button>
+                </div>
+
+                <div id="firma-vigencia-alert" class="alert hidden"></div>
+
+                <!-- Subvista: Ingresos -->
+                <div id="fin-ingresos" class="subview-panel">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Ingresos por Facturas y Servicios Cobrados</h2>
+                            <p class="muted-text">Registro consolidado de ingresos generados al cerrar tratos y emitir facturas a clientes.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="irAEmitirFacturaEnClientes()">Ir a Clientes para Facturar</button>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-label">Total Ingresos</span>
+                            <h3 id="mod-ing-total">$0.00</h3>
+                            <small class="kpi-trend" id="mod-ing-count">0 facturas emitidas</small>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Subtotal (Base Imponible)</span>
+                            <h3 id="mod-ing-subtotal">$0.00</h3>
+                            <small class="kpi-trend">Antes de IVA</small>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">IVA Generado</span>
+                            <h3 id="mod-ing-iva">$0.00</h3>
+                            <small class="kpi-trend">Impuesto acumulado</small>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Registro Histórico de Ingresos</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>N° Factura</th>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Forma de Pago</th>
+                                    <th>Subtotal</th>
+                                    <th>IVA</th>
+                                    <th>Total Ingreso</th>
+                                    <th>Comprobante</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-facturas"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Subvista: Gastos -->
+                <div id="fin-gastos" class="subview-panel hidden">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Gastos Operativos del Servicio Funerario</h2>
+                            <p class="muted-text">Registro obligatorio de gastos: traslados, cafetería, arreglo estético, limpieza y desinfección, trámites y otros.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="toggleFormPanel('panel-form-egreso')">Registrar Gasto</button>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-label">Total Gastos Acumulados</span>
+                            <h3 id="mod-gas-total">$0.00</h3>
+                            <small class="kpi-trend" id="mod-gas-count">0 gastos registrados</small>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Gasto Promedio</span>
+                            <h3 id="mod-gas-promedio">$0.00</h3>
+                            <small class="kpi-trend">Promedio por registro</small>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Categoría de Mayor Gasto</span>
+                            <h3 id="mod-gas-top">-</h3>
+                            <small class="kpi-trend" id="mod-gas-top-val">$0.00</small>
+                        </div>
+                    </div>
+
+                    <div id="panel-form-egreso" class="card form-drawer hidden">
+                        <div class="drawer-header">
+                            <h3>Registrar Gasto Operativo</h3>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleFormPanel('panel-form-egreso')">Cerrar</button>
+                        </div>
+                        <form id="form-egreso" class="grid-form">
+                            <div class="form-group">
+                                <label>Categoría de Gasto *</label>
+                                <select id="egr-categoria" required>
+                                    <option value="TRASLADO">Traslado y Carroza</option>
+                                    <option value="CAFETERIA">Servicio de Cafetería</option>
+                                    <option value="ESTETICA_PREPARACION">Arreglo Estético y Preparación</option>
+                                    <option value="LIMPIEZA_DESINFECCION">Limpieza y Desinfección de Salas</option>
+                                    <option value="TRAMITES_LEGALES">Trámites Legales y Sepultura</option>
+                                    <option value="OTROS">Otros Gastos</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Concepto del Gasto *</label><input type="text" id="egr-concepto" required placeholder="Detalle del gasto"></div>
+                            <div class="form-group"><label>Monto ($) *</label><input type="number" step="0.01" min="0.01" id="egr-monto" required></div>
+                            <div class="form-group"><label>Fecha del Gasto *</label><input type="date" id="egr-fecha" required></div>
+                            <div class="form-group"><label>Servicio Relacionado</label><select id="egr-servicio"></select></div>
+                            <div class="form-group"><label>Referencia / N° Recibo *</label><input type="text" id="egr-ref" required placeholder="N° comprobante o recibo"></div>
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleFormPanel('panel-form-egreso')">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Detalle de Gastos Registrados</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Categoría</th>
+                                    <th>Concepto</th>
+                                    <th>Referencia</th>
+                                    <th>Responsable</th>
+                                    <th>Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-egresos"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Subvista: Ganancias Brutas -->
+                <div id="fin-ganancias" class="subview-panel hidden">
+                    <div class="module-toolbar">
+                        <div>
+                            <h2>Ganancias Brutas y Rentabilidad</h2>
+                            <p class="muted-text">Consolidado de ingresos menos gastos operativos por período mensual y anual.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="switchTab('tab-gerencial')">Ver Gráficos Gerenciales</button>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-label">Ingresos Brutos</span>
+                            <h3 id="rep-ingresos">$0.00</h3>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-label">Gastos Operativos</span>
+                            <h3 id="rep-egresos">$0.00</h3>
+                        </div>
+                        <div class="kpi-card kpi-highlight">
+                            <span class="kpi-label">Ganancia Bruta Total</span>
+                            <h3 id="rep-ganancia">$0.00</h3>
+                            <small class="kpi-trend" id="rep-margen">Margen bruto: 0.0%</small>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Estado de Ganancias Brutas por Mes</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Período (Mes - Año)</th>
+                                    <th>Ingresos ($)</th>
+                                    <th>Gastos ($)</th>
+                                    <th>Ganancia Bruta ($)</th>
+                                    <th>Margen Bruto (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-ganancias-mensuales"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- VISTA 7: CONFIGURACIÓN Y SEGURIDAD                           -->
+            <!-- ============================================================ -->
+            <section id="tab-configuracion" class="tab-content hidden">
+                <div class="subnav-bar">
+                    <button type="button" class="subnav-btn active" data-sub="cfg-sri" onclick="switchSubView('tab-configuracion', 'cfg-sri', this)">Parámetros de Emisión</button>
+                    <button type="button" class="subnav-btn" data-sub="cfg-seguridad" onclick="switchSubView('tab-configuracion', 'cfg-seguridad', this)">Seguridad y Sesión</button>
+                    <button type="button" class="subnav-btn" data-sub="cfg-equipo" onclick="switchSubView('tab-configuracion', 'cfg-equipo', this)">Usuarios y Roles</button>
+                </div>
+
+                <div id="cfg-sri" class="subview-panel">
+                    <div class="card">
+                        <h3>Parámetros del Emisor y Firma Electrónica</h3>
+                        <form id="form-sri-config" class="grid-form">
+                            <div class="form-group">
+                                <label>Ambiente de Operación *</label>
+                                <select id="sri-ambiente" required>
+                                    <option value="1">Pruebas</option>
+                                    <option value="2">Producción</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Régimen Tributario *</label>
+                                <select id="sri-regimen" required>
+                                    <option value="GENERAL">Régimen General</option>
+                                    <option value="EMPRENDEDOR">Emprendedor</option>
+                                    <option value="NEGOCIO_POPULAR">Negocio Popular</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Obligado a Llevar Contabilidad *</label>
+                                <select id="sri-contabilidad" required>
+                                    <option value="false">No</option>
+                                    <option value="true">Sí</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Establecimiento *</label><input type="text" id="sri-estab" maxlength="3" value="001" required></div>
+                            <div class="form-group"><label>Punto de Emisión *</label><input type="text" id="sri-pto" maxlength="3" value="001" required></div>
+                            <div class="form-group"><label>Secuencial Actual *</label><input type="number" id="sri-secuencial" min="1" value="1" required></div>
+                            <div class="form-group"><label>RUC Proveedor Software *</label><input type="text" id="sri-ruc-prov" maxlength="13" required></div>
+                            <div class="form-group"><label>Fecha Vigencia Firma (.p12)</label><input type="date" id="sri-firma-vigencia"></div>
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Parámetros</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="cfg-seguridad" class="subview-panel hidden">
+                    <div class="card">
+                        <h3>Control de Tiempo de Sesión y Políticas de Acceso</h3>
+                        <form id="form-seguridad-sesion" class="grid-form">
+                            <div class="form-group">
+                                <label>Tiempo Máximo de Sesión Activa</label>
+                                <select id="sec-timeout-min">
+                                    <option value="15">15 minutos</option>
+                                    <option value="30" selected>30 minutos</option>
+                                    <option value="60">60 minutos</option>
+                                    <option value="120">120 minutos</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Cierre al Cambiar de Pestaña</label>
+                                <select id="sec-blur-lock">
+                                    <option value="0" selected>Mantener hasta tiempo límite</option>
+                                    <option value="5">Cerrar tras 5 minutos inactivo</option>
+                                    <option value="10">Cerrar tras 10 minutos inactivo</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Estándar de Contraseñas</label>
+                                <input type="text" readonly value="Mín. 8 caracteres, mayús., minús., número y símbolo">
+                            </div>
+                            <div class="form-actions full-col">
+                                <button type="submit" class="btn btn-primary">Guardar Política de Seguridad</button>
+                                <button type="button" class="btn btn-outline" onclick="extenderSesionActiva()">Renovar Tiempo de Sesión</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Bitácora de Auditoría de Accesos</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha y Hora</th>
+                                    <th>Usuario</th>
+                                    <th>Evento</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-auditoria-seg"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="cfg-equipo" class="subview-panel hidden">
+                    <div class="card">
+                        <h3>Usuarios y Roles de la Organización</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Correo</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-equipo"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL DE EXPIRACIÓN DE SESIÓN -->
+    <div id="session-warning-modal" class="modal hidden">
+        <div class="modal-content text-center">
+            <h3>Aviso de Expiración de Sesión</h3>
+            <p class="muted-text" style="margin-top: 0.5rem;">Por seguridad, su sesión se cerrará automáticamente en <strong id="session-modal-countdown">02:00</strong>.</p>
+            <div class="modal-actions" style="margin-top: 1.25rem;">
+                <button type="button" class="btn btn-primary" onclick="extenderSesionActiva()">Continuar Trabajando</button>
+                <button type="button" class="btn btn-outline" onclick="cerrarSesionSegura('Cierre manual desde aviso')">Cerrar Sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OBITUARIO QR -->
+    <div id="qr-modal" class="modal hidden">
+        <div class="modal-content text-center">
+            <h3 id="qr-title">Obituario Digital</h3>
+            <p class="muted-text" id="qr-sala-info">Enlace oficial para familiares y condolencias.</p>
+            <div id="qrcode-container" class="qr-box"></div>
+            <p id="qr-url-text" class="qr-url"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="copiarEnlaceQR()">Copiar Enlace</button>
+                <a id="qr-open-link" href="#" target="_blank" class="btn btn-primary">Abrir Obituario</a>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('qr-modal').classList.add('hidden')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
